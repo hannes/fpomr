@@ -1,0 +1,303 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<title>KLM Fuckup-O-Meter</title>
+
+	<meta charset="utf-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+	<script src="js/jquery.min.js"></script>
+	<script src="js/bootstrap.min.js"></script>
+	<script src="js/d3.min.js"></script>
+	<script src="js/metricsgraphics.min.js"></script>
+
+	<link rel="stylesheet" href="css/bootstrap.min.css">
+	<link rel="stylesheet" href="css/metricsgraphics.css">
+
+	<style>
+		.spacer {
+			margin-top: 70px;
+		}
+		label {
+			font-size: 16pt;
+		}
+
+		.mg-header {
+			font-size: 13pt;
+		}
+
+		.mg-x-axis text, .mg-y-axis text, .mg-histogram .axis text {
+			font-size: 1.5rem;
+		}
+
+		.mg-line1-color, .mg-barplot rect.mg-bar, .mg-barplot rect.mg-bar.active {
+			stroke: #009ddc;
+			fill : #009ddc;
+			cursor: pointer;
+		}
+
+		.mg-bar-rollover {
+			cursor:pointer;
+		}
+		path.mg-main-line {
+			stroke-width: 2px;
+			opacity: 1;
+		}
+
+		.fblink {
+			float: right;
+			display:block;
+		}
+		blockquote {
+			font-size: 11pt;
+		}
+	</style>
+}
+
+</head>
+<body>
+	<div class="container">
+		<div class="row top-buffer">
+			<div class="col-md-10 text-right" >
+				<h1><img src="http://www.klm.com/ams/frontend/img/klm_head@2x.png" style="height: 60px; margin-bottom: 0; margin-right: 20px;" /> Fuckup-O-Meter<h1>
+				</div>
+			</div>
+
+			<div class="row" >
+				<div class="col-md-12" style="margin-left: 22px">
+					<div class="btn-group btn-group-sm split-by-controls">
+						<button type="button" class="btn btn-default active" data-y_accessor="lostbag">Lost Bags</button>
+						<button type="button" class="btn btn-default" data-y_accessor="cancelled">Tickets Cancelled</button>
+						<button type="button" class="btn btn-default" data-y_accessor="overbook">Seats Overbooked</button>
+					</div>
+				</div>
+			</div>
+
+			
+
+			<div class="row" >
+				<div class="col-md-12">
+					<div id="overalltimeseries">
+					</div>
+				</div>
+			</div>
+
+			<div class="row" >
+				<div class="col-md-12">
+					<div id="bar1">
+
+					</div>
+				</div>
+			</div>
+<div class="row" >
+				<div class="col-md-12">
+					<div id="failbar">
+					</div>
+				</div>
+			</div>
+
+			<div class="row" style="margin-top: 30px">
+				<div class="col-md-12">
+					<div id="quotes">
+					</div>
+				</div>
+
+			</div>
+
+			<script>
+
+				var globals = {};
+
+				var selectedday = new Date('2015-10-30');
+				var selectedbarsday = selectedday;
+				var selectedy = "fuu";
+
+				var overall_params = {
+					title:'Complaint Frequency',
+					width: 1000,
+					height: 200,
+					bottom: 40,
+					top: 30,
+					left: 100,
+					area: false,
+					missing_is_hidden: true,
+					animate_on_load: true,
+					target: '#overalltimeseries',
+					x_accessor: 'date',
+					y_accessor: 'lostbag',
+					mouseover: function(d) {   selectedday = d.date; }
+				};
+
+				$('#overalltimeseries').click(function() {
+					updateBars(selectedday);
+					$('#quotes').empty();
+				});
+
+				$.ajax({url: "callback", data: {o: 42}, success: function(data) {
+
+				//d3.json('overall.json', function(data) {
+					data = MG.convert.date(data, 'date');
+					globals.data = data;
+					overall_params.data = data;
+					MG.data_graphic(overall_params);
+					updateBars(selectedday)
+
+				}});
+
+				function datecmp(d1, d2) {
+					return d1.getFullYear() == d2.getFullYear() && 
+					d1.getMonth() == d2.getMonth() && 
+					d1.getDate()== d2.getDate();
+				}
+
+				function updateBars(today) {
+					selectedbarsday = selectedday;
+					var daydata = {};
+
+					var ndays = 7;
+
+					var d = new Date(today);
+					d.setDate(d.getDate()-ndays);
+
+
+					globals.data.forEach(function(e) {
+						if (datecmp(e.date, today)) {
+							daydata = e;
+						}
+					});
+
+					var predictions = {lostbag: 0, cancelled: 0, overbook : 0};
+
+					globals.data.forEach(function(e) {
+
+						if (e.date >= d && e.date < today) {
+							predictions.lostbag   += e.lostbag;
+							predictions.cancelled += e.cancelled;
+							predictions.overbook  += e.overbook;
+						}
+					});
+
+					predictions.lostbag = predictions.lostbag/ndays;
+					predictions.cancelled = predictions.cancelled/ndays;
+					predictions.overbook = predictions.overbook/ndays;
+
+
+					var bar_data = [
+					{'label': 'Lost Bags',  'value': daydata.lostbag,   'baseline': predictions.lostbag, 'addfield' : 'lostbag'},
+					{'label': 'Cancelled',  'value': daydata.cancelled, 'baseline': predictions.cancelled, 'addfield' : 'cancelled'},
+					{'label': 'Overbooked', 'value': daydata.overbook,  'baseline': predictions.overbook, 'addfield' : 'overbook'}
+					];
+
+					MG.data_graphic({
+						title: 'Status on ' + today.toDateString(),
+						data: bar_data,
+						chart_type: 'bar',
+						x_accessor: 'value',
+						y_accessor: 'label',
+						baseline_accessor: 'baseline',
+						predictor_accessor: 'prediction',
+						width: 1000,
+						left: 100,
+						bottom: 0,
+						height: 130,
+						target: '#bar1',
+								        x_axis: false,
+
+						mouseover: function(d) {selectedy = d.addfield}
+
+					});
+				}
+
+				$('#bar1').click(function() {
+					updatePosts();
+				});
+
+
+				function createDateAsUTC(date) {
+					return new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate(), date.getHours(), date.getMinutes(), date.getSeconds()));
+				}
+
+
+				function updatePosts() {
+	// aaaaaaaah
+	var dt =createDateAsUTC(selectedbarsday).toISOString().substring(0,10);
+	$.ajax({url: "callback", data: {d: dt, c: selectedy}, success: function(data){
+		$('#quotes').empty();
+
+
+		data.data.forEach(function(e) {
+			e[2] = e[2].replace(/((lost|missing|verloren|kwijt).{1,100}bag|bag.{1,100}(lost|missing|verloren|kwijt))/gi, function(match) {return('<strong class="hl-lostbag">'+match+'</strong>')})
+			e[2] = e[2].replace(/(over\w*bo(oked|ekt))/gi, function(match) {return('<strong class="hl-overbook">'+match+'</strong>')})
+			e[2] = e[2].replace(/(cancelled|geannuleerd)/gi, function(match) {return('<strong class="hl-cancelled">'+match+'</strong>')})
+
+			$('#quotes').append('<blockquote><a class="fblink" target="_new" href="https://www.facebook.com/KLM/posts/'+e[0].substring(e[0].indexOf('_')+1)+'"><img src="https://static.xx.fbcdn.net/rsrc.php/yl/r/H3nktOa7ZMg.ico" style="height: 20px;"/></a><p>'+e[2]+'</p></blockquote>')
+		});
+
+	}});
+}
+
+$('.split-by-controls button').click(function() {
+	var new_y_accessor = $(this).data('y_accessor');
+	overall_params.y_accessor = new_y_accessor;
+	$(this).addClass('active').siblings().removeClass('active');
+	delete overall_params.xax_format;
+	MG.data_graphic(overall_params);
+
+
+	updateInfamous(new_y_accessor);
+
+});
+
+function updateInfamous(new_y_accessor) {
+	$.ajax({url: "callback", data: {f: new_y_accessor}, success: function(data){
+
+	console.log(data);
+var bar_data = [];
+	data.data.forEach(function(e) {
+		if (e[0].indexOf(',') > 0) {
+			e[0] = e[0].substring(0, e[0].indexOf(','))
+		}
+		bar_data.push({label: e[0], value:e[1]});
+	});
+
+	MG.data_graphic({
+		title: 'Infamous Destinations',
+		data: bar_data,
+		chart_type: 'bar',
+		x_accessor: 'value',
+		y_accessor: 'label',
+		width: 1000,
+		left: 100,
+		height: 170,
+		bottom: 0,
+		target: '#failbar',
+		        x_axis: false
+
+	});
+
+
+	}});
+}
+
+$('.modify-time-period-controls button').click(function() {
+	var past_n_days = $(this).data('time_period');
+	var data = modify_time_period(globals.data, past_n_days);
+	$(this).addClass('active').siblings().removeClass('active');
+	delete overall_params.xax_format;
+	overall_params.data = data;
+	MG.data_graphic(overall_params);
+});
+
+function modify_time_period(data, past_n_days) {
+	if (past_n_days !== '') {
+		return MG.clone(data).slice(past_n_days * -1);
+	}
+	return data;
+}
+
+updateInfamous('lostbag')
+
+</script>
+
+</body>
+</html>
