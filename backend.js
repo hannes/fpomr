@@ -10,7 +10,7 @@ var conn = monetdb.connect({host : 'localhost', dbname: 'hackathon', debug: fals
 var app = require('http').createServer(function (req, resp) {
 	var u = url.parse(req.url, true);
 	if (u.query.d) {
-		conn.query('select id, tsstr, txt from dd2 where date=\''  + u.query.d + '\' and '+ u.query.c +' order by tsstr desc;', function(err, res) {
+		conn.query('select id, tsstr, txt from klmrants join regex using (id) where dt=\''  + u.query.d + '\' and '+ u.query.c +' order by tsstr desc;', function(err, res) {
 		    if (err)  {
 		    	console.log(err);
 		    	return;
@@ -21,7 +21,7 @@ var app = require('http').createServer(function (req, resp) {
 		return;
 	}
 	if (u.query.f) {
-		conn.query('select odest, count(*) as n from dd2 left join dd4 using(id) where odest is not null and '+ u.query.f +'  group by odest order by n desc limit 5;', function(err, res) {
+		conn.query('select odest, count(*) as n from regex left join dd4 using(id) where odest is not null and '+ u.query.f +'  group by odest order by n desc limit 5;', function(err, res) {
 		    if (err)  {
 		    	console.log(err);
 		    	return;
